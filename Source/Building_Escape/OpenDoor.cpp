@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
+#include "Engine/World.h"
 #include "OpenDoor.h"
 
 // Sets default values for this component's properties
@@ -20,8 +20,14 @@ void UOpenDoor::BeginPlay()
 	Super::BeginPlay();
 	InitialYaw = GetOwner()->GetActorRotation().Yaw;
 	CurrentYaw = InitialYaw;
-	TargetYaw += InitialYaw; //TargetYaw = InitialYaw + TargetYaw;
+	OpenAngle += InitialYaw; //TargetYaw = InitialYaw + TargetYaw;
 	
+	if (!PressurePlate)
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s tiene el componente OpenDoor, pero no un PressurePlate"), *GetOwner()->GetName());
+	}
+
+	ActorThatOpen = GetWorld()->GetFirstPlayerController()->GetPawn();
 }
 
 
@@ -29,26 +35,31 @@ void UOpenDoor::BeginPlay()
 void UOpenDoor::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (PressurePlate->IsOverlappingActor(ActorThatOpen))
+	if (PressurePlate && PressurePlate->IsOverlappingActor(ActorThatOpen))
 	{
 		OpenDoor(DeltaTime);
+		DoorLastOPen = GetWorld()->GetTimeSeconds();
 	}
-	
-
-
-	/*UE_LOG(LogTemp, Warning, TEXT("%s"), *GetOwner()->GetActorRotation().ToString());
-	UE_LOG(LogTemp, Warning, TEXT("Yaw is: $f"), GetOwner()->GetActorRotation().Yaw);*/
-
-	/*FRotator OpenDoor(0.f, TargetYaw, 0.f);
-	float CurrentYaw = GetOwner()->GetActorRotation().Yaw;
-	OpenDoor.Yaw = FMath::Lerp(CurrentYaw, TargetYaw,0.02f);
-	GetOwner()->SetActorRotation(OpenDoor);*/
+	else {
+		if (GetWorld()->GetTimeSeconds() - DoorLastOPen > DoorCloseDelay)
+		{
+			CloseDoor(DeltaTime);
+		}
+	}
 	
 }
 
 void UOpenDoor::OpenDoor(float DeltaTime) 
 {
-	CurrentYaw = FMath::Lerp(CurrentYaw, TargetYaw, DeltaTime * 0.5f);
+	CurrentYaw = FMath::Lerp(CurrentYaw, OpenAngle, DeltaTime * DoorOpenSpeed);
+	FRotator DoorRotation = GetOwner()->GetActorRotation();
+	DoorRotation.Yaw = CurrentYaw;
+	GetOwner()->SetActorRotation(DoorRotation);
+}
+
+void UOpenDoor::CloseDoor(float DeltaTime)
+{
+	CurrentYaw = FMath::Lerp(CurrentYaw, InitialYaw, DeltaTime * DoorCloseSpeed);
 	FRotator DoorRotation = GetOwner()->GetActorRotation();
 	DoorRotation.Yaw = CurrentYaw;
 	GetOwner()->SetActorRotation(DoorRotation);
